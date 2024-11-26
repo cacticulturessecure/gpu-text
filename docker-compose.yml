@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  gpu-text-service:
+    build: .
+    ports:
+      - "8080:8080"
+      - "11434:11434"
+    volumes:
+      - ./app:/app/app
+      - ollama-models:/root/.ollama
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - OLLAMA_HOST=http://localhost:11434
+      - REDIS_HOST=localhost
+      - REDIS_PORT=6379
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  ollama-models:
