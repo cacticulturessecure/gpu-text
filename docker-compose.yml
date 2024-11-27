@@ -12,8 +12,7 @@ services:
     environment:
       - CUDA_VISIBLE_DEVICES=0
       - OLLAMA_HOST=http://localhost:11434
-      - REDIS_HOST=localhost
-      - REDIS_PORT=6379
+      - OLLAMA_MODEL=llama3.1:70b
     deploy:
       resources:
         reservations:
@@ -21,6 +20,9 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+        limits:
+          memory: 80G  # Ensure enough memory for the 70B parameter model
+    shm_size: '16gb'  # Increase shared memory size
 
 volumes:
   ollama-models:
