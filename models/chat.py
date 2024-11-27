@@ -17,7 +17,7 @@ class ChatCompletionRequest(BaseModel):
         min_items=1
     )
     model: str = Field(
-        default="llama2",
+        default="llama3.1:70b",
         description="The model to use for completion"
     )
     temperature: Optional[float] = Field(
