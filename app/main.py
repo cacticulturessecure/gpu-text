@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.api.v1.chat import router
-from app.utils.logging import RequestLoggingMiddleware
 import time
 import logging
 
@@ -18,7 +17,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(RequestLoggingMiddleware)
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -36,7 +34,7 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
-app.include_router(router)
+app.include_router(router, prefix=settings.API_V1_STR)
 
 @app.get("/health")
 async def health_check():

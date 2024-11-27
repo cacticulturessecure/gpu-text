@@ -13,6 +13,11 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - OLLAMA_HOST=http://localhost:11434
       - OLLAMA_MODEL=llama3.1:70b
+      - MAX_TOKENS=131072
+      - MAX_CONTEXT_LENGTH=131072
+      # Phase 2 - Redis Configuration (commented out)
+      # - REDIS_HOST=redis
+      # - REDIS_PORT=6379
     deploy:
       resources:
         reservations:
@@ -21,8 +26,21 @@ services:
               count: 1
               capabilities: [gpu]
         limits:
-          memory: 80G  # Ensure enough memory for the 70B parameter model
-    shm_size: '16gb'  # Increase shared memory size
+          memory: 80G
+    shm_size: '16gb'
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
+  # Phase 2 - Redis Service (commented out)
+  # redis:
+  #   image: redis:alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
 
 volumes:
   ollama-models:
+  # Phase 2 - Redis Volume (commented out)
+  # redis-data:

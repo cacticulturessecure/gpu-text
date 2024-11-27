@@ -8,7 +8,7 @@ from app.models.chat import (
 )
 from app.services.ollama import OllamaService
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter()
 
 async def get_ollama_service() -> OllamaService:
     return OllamaService()
