@@ -11,15 +11,15 @@ from datetime import datetime
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=getattr(logging, settings.LOG_LEVEL),
+    format=settings.LOG_FORMAT
 )
 logger = logging.getLogger("api")
 
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Cacticultures API Service",
+    description="Cacticultures GPU Text Service",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -28,16 +28,7 @@ app = FastAPI(
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://dev.cacticultures.com",
-        "https://staging.cacticultures.com",
-        "https://cacticultures.com",
-        "http://localhost:8001",  # Dev server
-        "http://localhost:8002",  # Staging server
-        "http://localhost:8003",  # Prod server
-        "http://localhost:3000",  # Next.js dev server
-        "http://localhost:8000"   # Local development
-    ],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
@@ -47,10 +38,12 @@ app.add_middleware(
         "Origin",
         "X-Requested-With",
         "X-CSRF-Token",
+        "X-API-Key"
     ],
     expose_headers=[
         "X-Process-Time",
         "X-API-Version",
+        "X-Model-Version"
     ],
     max_age=600,  # Cache preflight requests for 10 minutes
 )
@@ -64,7 +57,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={
             "detail": exc.detail,
             "path": request.url.path,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "type": "http_error"
         }
     )
 
@@ -77,11 +71,12 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={
             "detail": "Internal server error",
             "path": request.url.path,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "type": "internal_error"
         }
     )
 
-# Middleware for processing time
+# Middleware for processing time and version headers
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
@@ -89,6 +84,7 @@ async def add_process_time_header(request: Request, call_next):
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
     response.headers["X-API-Version"] = settings.API_V1_STR
+    response.headers["X-Model-Version"] = settings.OLLAMA_MODEL
     return response
 
 # Include API router
@@ -100,13 +96,34 @@ async def health_check():
     """
     Health check endpoint that returns detailed system status
     """
+    try:
+        # Check Ollama service
+        import httpx
+        async with httpx.AsyncClient() as client:
+            ollama_response = await client.get(
+                f"{settings.OLLAMA_HOST}/api/version",
+                timeout=5.0
+            )
+            ollama_status = "healthy" if ollama_response.status_code == 200 else "unhealthy"
+    except Exception as e:
+        logger.error(f"Ollama health check failed: {str(e)}")
+        ollama_status = "unhealthy"
+
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "api_version": settings.API_V1_STR,
-        "environment": os.getenv("ENVIRONMENT", "development"),
+        "environment": settings.ENVIRONMENT,
+        "services": {
+            "ollama": ollama_status,
+            "api": "healthy"
+        },
+        "models": {
+            "default": settings.OLLAMA_MODEL,
+            "available": settings.AVAILABLE_MODELS
+        },
         "cors": {
-            "origins": app.state.cors_origins,
+            "origins": settings.ALLOWED_ORIGINS,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
         },
         "system": {
@@ -122,17 +139,22 @@ async def startup_event():
     Initialize any connections or resources on startup
     """
     logger.info("Starting up FastAPI application")
-    # Store CORS origins in app state for health check
-    app.state.cors_origins = [
-        "https://dev.cacticultures.com",
-        "https://staging.cacticultures.com",
-        "https://cacticultures.com",
-        "http://localhost:8001",
-        "http://localhost:8002",
-        "http://localhost:8003",
-        "http://localhost:3000",
-        "http://localhost:8000"
-    ]
+    
+    # Verify Ollama connection
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{settings.OLLAMA_HOST}/api/version",
+                timeout=5.0
+            )
+            if response.status_code == 200:
+                logger.info(f"Connected to Ollama version: {response.json().get('version')}")
+            else:
+                logger.warning("Ollama service responded but may not be healthy")
+    except Exception as e:
+        logger.error(f"Failed to connect to Ollama service: {str(e)}")
+    
     logger.info("FastAPI application startup complete")
 
 # Shutdown Event
@@ -154,5 +176,6 @@ async def root():
         "api_version": settings.API_V1_STR,
         "docs_url": "/docs",
         "redoc_url": "/redoc",
-        "health_check": "/health"
+        "health_check": "/health",
+        "models": settings.AVAILABLE_MODELS
     }

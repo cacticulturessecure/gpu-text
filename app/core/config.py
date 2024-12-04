@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from typing import List, Dict, Any
 from functools import lru_cache
 import os
+import json
 
 class Settings(BaseSettings):
     # Basic API Settings
@@ -14,7 +15,7 @@ class Settings(BaseSettings):
     OLLAMA_HOST: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.1:70b"
     DEFAULT_TEMPERATURE: float = 0.7
-    MAX_TOKENS: int = 2000
+    MAX_TOKENS: int = 131072
     MAX_CONTEXT_LENGTH: int = 131072
     MODEL_EMBEDDING_SIZE: int = 8192
     
@@ -24,24 +25,27 @@ class Settings(BaseSettings):
     MODEL_ATTENTION_HEAD_COUNT_KV: int = 8
     MODEL_FEED_FORWARD_LENGTH: int = 28672
     
-    # Redis Configuration
-    REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
-    CACHE_TTL: int = 3600
-    
     # CORS Settings
     ALLOWED_ORIGINS: List[str] = [
         "https://dev.cacticultures.com",
         "https://staging.cacticultures.com",
         "https://cacticultures.com",
-        "http://localhost:8001",  # Dev server
-        "http://localhost:8002",  # Staging server
-        "http://localhost:8003",  # Prod server
-        "http://localhost:3000",  # Next.js dev server
-        "http://localhost:8000"   # Local development
+        "http://localhost:8000",
+        "http://localhost:8001",
+        "http://localhost:8002",
+        "http://localhost:8003",
+        "http://localhost:8004",
+        "http://localhost:8005",
+        "http://localhost:8006",
+        "http://localhost:8007",
+        "http://localhost:8008",
+        "http://localhost:8009",
+        "http://localhost:8010"
     ]
 
+    # Available Models
+    AVAILABLE_MODELS: List[str] = ["llama3.1:70b", "qwq:32b"]
+    
     # Security Settings
     API_KEY_HEADER: str = "X-API-Key"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -70,7 +74,7 @@ class Settings(BaseSettings):
         case_sensitive = True
         
         # Environment variable schema
-        env_prefix = "CACTICULTURES_"  # Use this prefix for environment variables
+        env_prefix = "CACTICULTURES_"
         
         # Additional environment files for different environments
         env_file_encoding = 'utf-8'
@@ -85,12 +89,6 @@ class Settings(BaseSettings):
                    if not origin.startswith("http://localhost")]
         return self.ALLOWED_ORIGINS
 
-    def get_redis_url(self) -> str:
-        """
-        Get Redis URL from configuration
-        """
-        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-
     def get_model_config(self) -> Dict[str, Any]:
         """
         Get complete model configuration
@@ -103,6 +101,18 @@ class Settings(BaseSettings):
             "attention_head_count_kv": self.MODEL_ATTENTION_HEAD_COUNT_KV,
             "feed_forward_length": self.MODEL_FEED_FORWARD_LENGTH,
         }
+
+    def parse_env_var(self, field_name: str, raw_val: str) -> Any:
+        """
+        Custom parser for environment variables
+        """
+        if field_name in ["ALLOWED_ORIGINS", "AVAILABLE_MODELS"] and isinstance(raw_val, str):
+            try:
+                return json.loads(raw_val)
+            except json.JSONDecodeError:
+                # Fall back to comma-separated string for backward compatibility
+                return [x.strip() for x in raw_val.split(",")]
+        return raw_val
 
 @lru_cache()
 def get_settings() -> Settings:

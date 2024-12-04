@@ -10,7 +10,6 @@ ENV PYTHONUNBUFFERED=1 \
     DEFAULT_TEMPERATURE=0.7 \
     MAX_TOKENS=2000
 
-# Install system dependencies
 RUN apt-get update -y && \
     apt-get install -y \
         git \
@@ -18,7 +17,9 @@ RUN apt-get update -y && \
         software-properties-common \
         curl \
         wget \
-        build-essential && \
+        build-essential \
+        nano \
+        screen && \
     add-apt-repository -y ppa:deadsnakes/ppa && \
     apt-get install -y python3.10 python3-pip && \
     apt-get clean && \
@@ -50,3 +51,30 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
+
+
+I want to also install nano and screen what do i modify and where?
+
+To install nano and screen, you should add them to the list of packages installed using apt-get. You can modify the first RUN command where other system dependencies are being installed. Here's the modified section:
+
+```dockerfile
+# Install system dependencies
+RUN apt-get update -y && \
+    apt-get install -y \
+        git \
+        ffmpeg \
+        software-properties-common \
+        curl \
+        wget \
+        build-essential \
+        nano \
+        screen && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get install -y python3.10 python3-pip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+```
+
+I've added `nano` and `screen` to the list of packages in the apt-get install command. This will ensure that both nano and screen are installed in your Docker image along with the other system dependencies.
+
+After making this change, when you build your Docker image, nano and screen will be available for use within the container.
